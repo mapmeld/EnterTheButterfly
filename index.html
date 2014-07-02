@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+ 
+body {
+  background: #fcfcfa;
+}
+ 
+.stroke {
+  fill: none;
+  stroke: #000;
+  stroke-width: 3px;
+}
+ 
+.fill {
+  fill: #fff;
+}
+ 
+.graticule {
+  fill: none;
+  stroke: #777;
+  stroke-width: .5px;
+  stroke-opacity: .5;
+}
+ 
+.land {
+  fill: #222;
+}
+ 
+.boundary {
+  fill: #000;
+  stroke: #fff;
+  stroke-width: .5px;
+}
+
+.rotate {
+  transition: 3s linear;
+}
+ 
+</style>
+<body>
+<div class="rotate">
+</div>
+<script src="https://code.jquery.com/jquery-1.11.1.min.js"></script>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script src="http://d3js.org/d3.geo.polyhedron.v0.min.js"></script>
+<script src="http://d3js.org/topojson.v1.min.js"></script>
+<script>
+ 
+var width = 960,
+    height = 550;
+  
+var projection = d3.geo.polyhedron.waterman()
+    .rotate([20, 0])
+    .scale(118)
+    .translate([width / 2, height / 2])
+    .precision(.1);
+
+ 
+var path = d3.geo.path()
+    .projection(projection);
+ 
+var graticule = d3.geo.graticule();
+
+ 
+var svg = d3.select(".rotate").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var defs = svg.append("defs");
+ 
+defs.append("path")
+    .datum({type: "Sphere"})
+    .attr("id", "sphere")
+    .attr("d", path);
+ 
+defs.append("clipPath")
+    .attr("id", "clip")
+  .append("use")
+    .attr("xlink:href", "#sphere");
+ 
+svg.append("use")
+    .attr("class", "stroke")
+    .attr("xlink:href", "#sphere");
+ 
+svg.append("use")
+    .attr("class", "fill")
+    .attr("xlink:href", "#sphere");
+ 
+svg.append("path")
+    .datum(graticule)
+    .attr("class", "graticule")
+    .attr("clip-path", "url(#clip)")
+    .attr("d", path);
+ 
+ 
+d3.json("world-50m.json", worldmap);
+
+var scale = 1;
+var made_ctr_x = 0;
+var made_ctr_y = 0;
+
+function worldmap(error, world){
+ 
+  var countries = svg.insert("path", ".graticule")
+      .datum(topojson.feature(world, world.objects.countries))
+      .attr("class", "boundary")
+      .attr("clip-path", "url(#clip)")
+      .attr("d", path);
+      
+      $(".boundary").on("click", function(e) {
+        scale *= 1.8;
+         var xy_coords = [e.offsetX, e.offsetY];
+         
+         // rotate to north
+         var ll_coords = projection.invert([ xy_coords[0], xy_coords[1] ]);
+         var xy_upper = projection([ ll_coords[0] + 0.1, ll_coords[1] ]);
+         var theta_wrong = Math.atan( (xy_upper[0] - ll_coords[0]) / (xy_upper[1] - ll_coords[1]) ) / Math.PI * -180;
+         
+        ctr_x = -1 * width * ll_coords[0] / 360;
+        ctr_y = -1 * height * ll_coords[1] / 180;
+        
+        
+        // quadrants behave differently 
+         if(ll_coords[0] > 0 &&  ll_coords[1] > 0) {
+           theta_wrong *= -1;
+           ctr_y *= -1.5 * scale;
+
+         }
+         else if (ll_coords[0] > 0  && ll_coords[1] < 0){
+           theta_wrong *= -1;
+           ctr_y *= 2 * scale;
+         }
+         else if (ll_coords[0] < 0  && ll_coords[1] < 0){
+           ctr_y *= -3 * scale;
+         }
+
+         // base on existing offsets
+         made_ctr_x /=1.8;
+         made_ctr_y /= 1.8;
+         made_ctr_x += ctr_x;
+         made_ctr_y += ctr_y;
+                
+          $(".rotate").css({
+            "transform": "rotateZ(" + theta_wrong + "deg) scale(" + scale + ", " + scale + ")",
+            "margin-left": made_ctr_x,
+            "margin-top": made_ctr_y });
+        });
+}
+
+ 
+d3.select(self.frameElement).style("height", height + "px");
+ 
+</script>
+</body>
